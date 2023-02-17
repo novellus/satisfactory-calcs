@@ -57,7 +57,7 @@ class production_line():
         if not self.ing.name in raw_inputs:
             self.recipe = recipes[self.ing.name]
             self.num_machines = self.ing.number / self.recipe.rate
-            self.sort_key = (machine_order.index(self.recipe.machine), -self.ing.number, self.ing.name)
+            self.sort_key = (machine_order.index(self.recipe.machine), self.ing.name)
 
             scale_factor = self.ing.number
             if self.recipe.primary_output is not None:
@@ -72,7 +72,7 @@ class production_line():
                 ing.number *= scale_factor
 
         else:
-            self.sort_key = (-1, -self.ing.number, self.ing.name)
+            self.sort_key = (-1, self.ing.name)
 
     def __str__(self):
         if self.ing.name in raw_inputs:
@@ -83,16 +83,16 @@ class production_line():
         s += f'{self.ing.number:.1f} x {self.ing.name}'
         
         if not self.ing.name in raw_inputs:
-            s += f' ({self.num_machines:.1f} x {self.recipe.machine})'
+            s += f' ({self.num_machines:.2f} x {self.recipe.machine})'
             for ing in self.excess_outputs:
-                s += f'\n    Recycle: {ing.number:.1f} x {ing.name}'
+                s += f'\n    Recycle: {ing.number:.2f} x {ing.name}'
             for ing in self.inputs:
-                s += f'\n    Ingredient: {ing.number:.1f} x {ing.name}'
+                s += f'\n    Ingredient: {ing.number:.2f} x {ing.name}'
         
         return s
 
 
-machine_order = ['smelter', 'foundry', 'refinery', 'constructor', 'assembler', 'manufacturer', 'packager', 'fuel generator']
+machine_order = ['smelter', 'foundry', 'refinery', 'fuel generator', 'constructor', 'assembler', 'manufacturer', 'packager']
 
 
 # recipes
@@ -508,9 +508,28 @@ for _ in range(len(sym_vars.raw_inputs)):
 
 
 
-# order steps, and outfit with additional information
+# outfit steps with additional pruoduction line info
 production_lines = [production_line(step) for step in steps]
-production_lines.sort(key=lambda x: x.sort_key)
+
+# reverse topologically sort production lines
+#   ignore excess outputs to avoid cyclical dependancies
+#   always put raw_inputs first, regardless of when they are liberated in the topology
+_production_lines = []
+raw_input_lines = [line for line in production_lines if line.ing.name in raw_inputs]
+production_lines = [line for line in production_lines if line.ing.name not in raw_inputs]
+while production_lines:
+    # collect list of lines with no incoming dependancy edges
+    depended_upon = {ing.name for line in production_lines for ing in line.inputs}
+    not_depended_upon = [line for line in production_lines if line.ing.name not in depended_upon]
+    assert len(not_depended_upon) > 0, f'Failed to find any nodes without dependancies, {production_lines}'
+
+    # sort this subset of production lines, insert them into the new list, and clear from the original list
+    not_depended_upon.sort(key=lambda x: x.sort_key, reverse=True)
+    _production_lines += not_depended_upon
+    production_lines = [line for line in production_lines if line not in not_depended_upon]
+
+_production_lines += sorted(raw_input_lines, key=lambda x: x.sort_key, reverse=True)
+production_lines = list(reversed(_production_lines))
 
 # print production lines
 print(f'Production Lines ({len(production_lines)})')
