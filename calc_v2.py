@@ -1,4 +1,5 @@
 # imports
+import math
 import re
 import pprint
 import sympy
@@ -80,7 +81,7 @@ class production_line():
         else:
             s = 'Line: '
 
-        s += f'{self.ing.number:.1f} x {self.ing.name}'
+        s += f'{self.ing.number:.2f} x {self.ing.name}'
         
         if not self.ing.name in raw_inputs:
             s += f' ({self.num_machines:.2f} x {self.recipe.machine})'
@@ -92,7 +93,7 @@ class production_line():
         return s
 
 
-machine_order = ['smelter', 'foundry', 'refinery', 'fuel generator', 'constructor', 'assembler', 'manufacturer', 'packager']
+machine_order = ['smelter', 'foundry', 'refinery', 'blender', 'fuel generator', 'constructor', 'assembler', 'manufacturer', 'packager']
 
 
 # recipes
@@ -141,6 +142,10 @@ recipes = [
     # recipe(inputs =  [ingredient(name = 'iron ingot',              number = 5)],
     #        outputs = [ingredient(name = 'wire',                    number = 9)],
     #        rate = 22.5, machine = 'constructor'),
+    # recipe(inputs =  [ingredient(name = 'copper ingot',            number = 4),
+    #                   ingredient(name = 'caterium ingot',          number = 1)],
+    #        outputs = [ingredient(name = 'wire',                    number = 30)],
+    #        rate = 90, machine = 'assembler'),
 
     recipe(inputs =  [ingredient(name = 'wire',                    number = 2)],
            outputs = [ingredient(name = 'cable',                   number = 1)],
@@ -266,12 +271,12 @@ recipes = [
            outputs = [ingredient(name = 'fuel',                    number = 4)],
            rate = 40, machine = 'refinery'),
 
-    # recipe(inputs =  [ingredient(name = 'fuel',                    number = 1)],
-    #        outputs = [], name='power generation fuel',
-    #        rate = 12, machine = 'fuel generator'),
-    recipe(inputs =  [ingredient(name = 'turbofuel',               number = 1)],
-           outputs = [], name='power generation turbofuel',
-           rate = 4.5, machine = 'fuel generator'),
+    recipe(inputs =  [ingredient(name = 'fuel',                    number = 1)],
+           outputs = [], name='power generation fuel',
+           rate = 12, machine = 'fuel generator'),
+    # recipe(inputs =  [ingredient(name = 'turbofuel',               number = 1)],
+    #        outputs = [], name='power generation turbofuel',
+    #        rate = 4.5, machine = 'fuel generator'),
 
     recipe(inputs =  [ingredient(name = 'fuel',                    number = 6),
                       ingredient(name = 'compacted coal',          number = 4)],
@@ -341,6 +346,49 @@ recipes = [
            outputs = [ingredient(name = 'radio control unit',      number = 2)],
            rate = 2.5, machine = 'manufacturer'),
 
+    recipe(inputs =  [ingredient(name = 'gas filter',              number = 1),
+                      ingredient(name = 'quickwire',               number = 5),
+                      ingredient(name = 'aluminum casing',         number = 1)],
+           outputs = [ingredient(name = 'iodine infused filter',   number = 1)],
+           rate = 3.75, machine = 'manufacturer'),
+    recipe(inputs =  [ingredient(name = 'coal',                    number = 5),
+                      ingredient(name = 'rubber',                  number = 2),
+                      ingredient(name = 'fabric',                  number = 2)],
+           outputs = [ingredient(name = 'gas filter',              number = 1)],
+           rate = 7.5, machine = 'manufacturer'),
+    recipe(inputs =  [ingredient(name = 'mycelia',                 number = 1),
+                      ingredient(name = 'biomass',                 number = 5)],
+           outputs = [ingredient(name = 'fabric',                  number = 1)],
+           rate = 15, machine = 'assembler'),
+
+    recipe(inputs =  [ingredient(name = 'sulfur',                  number = 5),
+                      ingredient(name = 'water',                   number = 5)],
+           outputs = [ingredient(name = 'sulfuric acid',           number = 5)],
+           rate = 50, machine = 'refinery'),
+    recipe(inputs =  [ingredient(name = 'sulfuric acid',           number = 2.5),
+                      ingredient(name = 'alumina solution',        number = 2),
+                      ingredient(name = 'aluminum casing',         number = 1)],
+           outputs = [ingredient(name = 'battery',                 number = 1),
+                      ingredient(name = 'water',                   number = 1.5, is_primary = False)],
+           rate = 20, machine = 'blender'),
+
+    recipe(inputs =  [ingredient(name = 'quickwire',               number = 56),
+                      ingredient(name = 'cable',                   number = 10),
+                      ingredient(name = 'circuit board',           number = 1)],
+           outputs = [ingredient(name = 'high speed connector',    number = 1)],
+           rate = 3.75, machine = 'manufacturer'),
+    recipe(inputs =  [ingredient(name = 'computer',                number = 2),
+                      ingredient(name = 'ai limiter',              number = 2),
+                      ingredient(name = 'high speed connector',    number = 3),
+                      ingredient(name = 'plastic',                 number = 28)],
+           outputs = [ingredient(name = 'supercomputer',           number = 1)],
+           rate = 1.875, machine = 'manufacturer'),
+
+    recipe(inputs =  [ingredient(name = 'adaptive control unit',    number = 2),
+                      ingredient(name = 'super computer',           number = 1)],
+           outputs = [ingredient(name = 'assembly director system', number = 1)],
+           rate = 0.75, machine = 'assembler'),
+
     # TODO create resource sinks / waste disposal paths
 ]
 
@@ -393,17 +441,11 @@ all_sym_vars = [v for k,v in sym_vars.recipes.items()] + [v for k,v in sym_vars.
 # target = ingredient(name = 'modular engine', number = 500 / 120)
 # target = ingredient(name = 'adaptive control unit', number = 1)
 # target = ingredient(name = 'turbofuel', number = 4.5*20)
-target = [ingredient(name = 'alclad aluminum sheet', number = sympy.Rational('100')),
-          ingredient(name = 'aluminum casing', number = sympy.Rational('100')),
-          ingredient(name = 'radio control unit', number = sympy.Rational('5')),
-          # ingredient(name = 'aluminum casing', number = sympy.Rational('2.5')),
-          # ingredient(name = 'crystal oscillator', number = sympy.Rational('2.5')),
-          # ingredient(name = 'computer', number = sympy.Rational('2.5')),
-          # ingredient(name = 'circuit board', number = sympy.Rational('2.5')),
-          # ingredient(name = 'cable', number = sympy.Rational('2.5')),
-          # ingredient(name = 'plastic', number = sympy.Rational('100')),
-          # ingredient(name = 'screw', number = sympy.Rational('2.5')),
-          ]
+# target = [ingredient(name = 'alclad aluminum sheet', number = sympy.Rational('100')),
+#           ingredient(name = 'aluminum casing', number = sympy.Rational('100')),
+#           ingredient(name = 'radio control unit', number = sympy.Rational('5')),
+#           ]
+target = [ingredient(name = 'supercomputer', number = sympy.Rational('1.875'))]
 
 target = {ing.name: ing for ing in target}
 
@@ -468,6 +510,7 @@ valid_types = [  # for conversion to float
     sympy.core.numbers.Zero,
     sympy.core.numbers.Rational,
     sympy.core.numbers.Integer,
+    sympy.core.numbers.Float,
 ]
 for val in solution:
     assert type(val) in valid_types, f'unsupported type, {type(val)}, {val}'
@@ -490,7 +533,7 @@ for _ in range(len(sym_vars.recipes)):
     else:
         output_number = 1  # do not scale recipes with zero outputs, by output rate
 
-    if recipe_multiplier != 0:
+    if not math.isclose(recipe_multiplier, 0, abs_tol=1e-9):
         steps.append(ingredient(name = r.name, number = output_number * recipe_multiplier))
 
     i_sym_var += 1
@@ -500,7 +543,7 @@ for _ in range(len(sym_vars.raw_inputs)):
     number = solution[i_sym_var]
     name = sym_names.raw_inputs[sym_var]
 
-    if number != 0:
+    if not math.isclose(number, 0, abs_tol=1e-9):
         steps.append(ingredient(name = name, number = number))
 
     i_sym_var += 1
